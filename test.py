@@ -74,21 +74,24 @@ def main():
         print('Listening... (press Ctrl+C to stop)')
 
         try:
+            lines=""
             while True:
                 partial_transcript, is_endpoint = cheetah.process(recorder.read())
-                print(partial_transcript, end='', flush=True)
+                lines += partial_transcript
                 if is_endpoint:
-                    line = cheetah.flush();
-                    print(line);
-                    response = client.audio.speech.create(
-                      model="tts-1",
-                      voice="alloy",
-                      input=line,
-                      response_format="opus"
-                    )
-                    recorder.stop()
-                    playback(response)
-                    recorder.start()
+                    line = cheetah.flush()
+                    lines += line
+                    print(lines)
+                    with client.audio.speech.with_streaming_response.create(
+                        model="tts-1",
+                        voice="alloy",
+                        input=lines,
+                        response_format="opus"
+                        ) as response:
+                        recorder.stop()
+                        playback(response)
+                        recorder.start()
+                    lines=""
         finally:
             print()
             recorder.stop()
