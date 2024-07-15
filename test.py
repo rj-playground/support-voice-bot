@@ -7,14 +7,42 @@ import soundfile as sf
 import sounddevice as sd
 import time
 
-
-
-
 from openai import OpenAI
+
+from langchain_openai import ChatOpenAI
+from langchain_core.chat_history import (
+    BaseChatMessageHistory,
+    InMemoryChatMessageHistory,
+)
+from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.messages import HumanMessage
+
+
+
+store = {}
+
+model = ChatOpenAI(model="gpt-3.5-turbo")
+
+
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in store:
+        store[session_id] = InMemoryChatMessageHistory()
+    return store[session_id]
+
+
+with_message_history = RunnableWithMessageHistory(model, get_session_history)
+
 
 client = OpenAI()
 
+def processing(line):
+    config = {"configurable": {"session_id": "abc2"}}
 
+    response = with_message_history.invoke(
+        [HumanMessage(content=line)],
+        config=config,
+    )
+    return response.content
 
 def playback(spoken_response):
     buffer = io.BytesIO()
@@ -81,11 +109,13 @@ def main():
                 if is_endpoint:
                     line = cheetah.flush()
                     lines += line
-                    print(lines)
+                    print("input:\t" + lines)
+                    agent_response = processing(lines)
+                    print("agent:\t " + agent_response)
                     with client.audio.speech.with_streaming_response.create(
                         model="tts-1",
                         voice="alloy",
-                        input=lines,
+                        input=agent_response,
                         response_format="opus"
                         ) as response:
                         recorder.stop()
